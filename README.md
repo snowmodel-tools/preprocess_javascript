@@ -19,6 +19,5 @@ Steps to Run this code:
 * Click on 'Run'. At this point you can explore the three tabs in the right toolbar (Inspecctor / Console / Tasks). Additionally, you will see data layers begin to appear in the bottom panel of GEE.
 * Choose 'Tasks'. You will see many image names with a blue 'run' button to the right of each. For each of these, you must click 'run'. This will bring up a dialog box asking if you want to initiate export. You can hit return and it will do so. Repeat this for all images.
 * Go to wherever you directed output (you have that option in the dialog box). Most commonly, this will be your Google Drive. You will find all exported geotiff images there.
----
----
+
 Use the outputs of this workflow for the next step in preprocessing, found in the preprocess_matlab folder.
