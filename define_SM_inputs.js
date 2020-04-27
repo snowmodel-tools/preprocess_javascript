@@ -1,12 +1,11 @@
 // Script written by Ryan L. Crumley, July 2019
 // Edited by DFH to add PRISM and fix NLCD, July 2019
 // Edited by Nina to add SWR & LWR, Dec 2019
+// Updated by Ryan, April 2020. Added multiband image export for PRISM, modified the resolution, changed some commenting, commented out some of the map visulizations.
+
  
-// When using this script, simply copy and paste to your own file directory system.
-// Experiment and make changes to your own version of this script.
-// Any changes that you make here will be saved here permanently. Only make changes that work!
-// If you make changes, comment them out in a descriptive manner, and leave your name and date in the comments like;
-// RLC add, 2019-07-15 Blah Blah Blah
+// When using this script, simply copy and paste to your own GEE directory system.
+// If you make changes, comment them out in a descriptive manner, and leave your name and date in the comment line.
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -53,11 +52,20 @@ var maxLat2 = (maxLat + 0.25);
 // Input the max Long, upper right corner
 var maxLong2 = (maxLong + 0.5);
 
-// This resolution for final output of NLCD and DEM only
+// This resolution for the NLCD and DEM outputs for the SnowModel domain
 // This is in meters
-var my_resolution = 100
+var sm_resolution = 100
+
+// Resolution for the PRISM output. This shoud change by Latitude of the domain
+// because the PRISM product spatial resolution is 2.5 minutes, which equals 150 arc seconds.
+// You can use this arc-second calculator to estimate the correct value for the PRISM resolution by latitude
+// https://opendem.info/arc2meters.html
+// This is one arc-second in meters for 43 degrees N Latitude
+var one_arcsecond = 22.57
+var PRISM_resolution = (one_arcsecond * 150) 
 
 // Define the final output projection using EPSG codes
+// These are the EPSG codes for the final projection of your SnowModel simulation.
 // WGS UTM Zone 12 Code for Idaho/Wyoming = 32612
 // WGS UTM Zone 11 Code for Nevada        = 32611
 // WGS UTM Zone 10 Code for West Coast    = 32610
@@ -73,10 +81,9 @@ var lc_name = 'NLCD2016';
 
 // The Beginning and End Dates you care about //
 // This will start on the 'begin' date at 0:00 and the last iteration will be 
-// on the day before the 'end' date below. Look at the printed variable 'tair from CFSv2' 
-// in the console to double check.
+// on the day before the 'end' date below.
 var begin = '2014-09-01';
-var end = '2019-09-01';
+var end = '2015-09-02';
 
 //////////////////////////////////////////////////////////////////
 /////////////////      DOMAIN     ////////////////////////////////
@@ -90,18 +97,17 @@ var my_domain = ee.Geometry.Rectangle({
   proj: 'EPSG:4326',
   geodesic:true,
 });
-//,'EPSG:32612',false);
 
-// This adds the domain you care about to the visualization
+// This adds the domain you care about to the visualization in the GEE code editor.
 Map.addLayer(my_domain,visparams,'My Domain');
 print (my_domain);
 
-// This adds the extent of the reanalysis product to the visualization.
+// This adds the extent of the reanalysis product to the visualization the GEE code editor.
 var my_domain2 = ee.Geometry.Rectangle([minLong2,minLat2,maxLong2,maxLat2]);//,'EPSG:32612',false);
 Map.addLayer(my_domain2,visparams,'My Reanalysis Domain');
 print (my_domain2);
 
-// Check the domain area in meters squared. Uncomment to check.
+// Check the domain area in meters squared. Uncomment using Command /.
 //var my_domain_area = my_domain.area();
 //print(my_domain_area);
 
@@ -143,10 +149,10 @@ print(info90,'Band Info');
 
 ////////   Import NLCD Dataset   ////////////////////
 var NLCD = ee.ImageCollection('USGS/NLCD');
-//Next: the NLCD has numerous images for different years. I want to use
-//the most current (2016), so I filter by time to isolate 2016 slice.
+//Note: the NLCD has numerous images for different years.
 var landcover = NLCD.select('landcover');
-var landcoverfiltered=landcover.filterDate('2015-01-01','2018-01-01');
+// Define the timeframe of NLCD images to select. Currently, its set to the previous 5 years.
+var landcoverfiltered=landcover.filterDate('2015-01-01','2020-01-01');
 var landcoverVis = {
   min: 0.0,
   max: 95.0,
@@ -156,9 +162,9 @@ var landcoverVis = {
     'a3cc51', '82ba9e', 'dcd939', 'ab6c28', 'b8d9eb', '6c9fb8'
   ],
 };
-// Next, the following is the way I have been able to convert the image collection 
-// (only one image at this point) to a single image. Must be a better way.
-var lcsingle=landcoverfiltered.median();
+// Create a single image out of the image collection using the most common land cover 
+// designation from the previous 5 years.
+var lcsingle=landcoverfiltered.mode();
 Map.addLayer(lcsingle, landcoverVis, 'Landcover');
 
 ////////////////   Datasets of Interest  //////////////////////
@@ -169,126 +175,108 @@ Map.addLayer(lcsingle, landcoverVis, 'Landcover');
 //NOTE: you can pick any 30 year period you want. I chose 1985-2015.
 
 /////////  Import PRISM Climatologies   ////////////////////
-// Precip first...
+// Select precipitation by month and take the mean
 var prism = ee.ImageCollection('OREGONSTATE/PRISM/AN81m');
 var precipitation = prism.select('ppt');
 var janppt = precipitation.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(1,1,'month'));
+.filter(ee.Filter.calendarRange(1,1,'month')).mean();
 var febppt = precipitation.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(2,2,'month'));
+.filter(ee.Filter.calendarRange(2,2,'month')).mean();
 var marppt = precipitation.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(3,3,'month'));
+.filter(ee.Filter.calendarRange(3,3,'month')).mean();
 var aprppt = precipitation.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(4,4,'month'));
+.filter(ee.Filter.calendarRange(4,4,'month')).mean();
 var mayppt = precipitation.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(5,5,'month'));
+.filter(ee.Filter.calendarRange(5,5,'month')).mean();
 var junppt = precipitation.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(6,6,'month'));
+.filter(ee.Filter.calendarRange(6,6,'month')).mean();
 var julppt = precipitation.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(7,7,'month'));
+.filter(ee.Filter.calendarRange(7,7,'month')).mean();
 var augppt = precipitation.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(8,8,'month'));
+.filter(ee.Filter.calendarRange(8,8,'month')).mean();
 var sepppt = precipitation.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(9,9,'month'));
+.filter(ee.Filter.calendarRange(9,9,'month')).mean();
 var octppt = precipitation.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(10,10,'month'));
+.filter(ee.Filter.calendarRange(10,10,'month')).mean();
 var novppt = precipitation.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(11,11,'month'));
+.filter(ee.Filter.calendarRange(11,11,'month')).mean();
 var decppt = precipitation.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(12,12,'month'));
+.filter(ee.Filter.calendarRange(12,12,'month')).mean();
 
-// reduce image collection with mean()
-var janmean = janppt.mean();
-var febmean = febppt.mean();
-var marmean = marppt.mean();
-var aprmean = aprppt.mean();
-var maymean = mayppt.mean();
-var junmean = junppt.mean();
-var julmean = julppt.mean();
-var augmean = augppt.mean();
-var sepmean = sepppt.mean();
-var octmean = octppt.mean();
-var novmean = novppt.mean();
-var decmean = decppt.mean();
+// Create a multiband image for export
+var prec = janppt.addBands(febppt).addBands(marppt).addBands(aprppt).addBands(mayppt).addBands(junppt).addBands(julppt).addBands(augppt).addBands(sepppt).addBands(octppt).addBands(novppt).addBands(decppt)
+print(prec,'ppt')
 
-var precipitationVis = {
-  min: 0.0,
-  max: 300.0,
-  palette: ['red', 'yellow', 'green', 'cyan', 'purple'],
-};
-Map.setCenter(-100.55, 40.71, 4);
-Map.addLayer(janmean, precipitationVis, 'Jan Precipitation');
-Map.addLayer(febmean, precipitationVis, 'Feb Precipitation');
-Map.addLayer(marmean, precipitationVis, 'Mar Precipitation');
-Map.addLayer(aprmean, precipitationVis, 'Apr Precipitation');
-Map.addLayer(maymean, precipitationVis, 'May Precipitation');
-Map.addLayer(junmean, precipitationVis, 'Jun Precipitation');
-Map.addLayer(julmean, precipitationVis, 'Jul Precipitation');
-Map.addLayer(augmean, precipitationVis, 'Aug Precipitation');
-Map.addLayer(sepmean, precipitationVis, 'Sep Precipitation');
-Map.addLayer(octmean, precipitationVis, 'Oct Precipitation');
-Map.addLayer(novmean, precipitationVis, 'Nov Precipitation');
-Map.addLayer(decmean, precipitationVis, 'Dec Precipitation');
+// Uncomment using Command / for visualization
+// var precipitationVis = {
+//   min: 0.0,
+//   max: 300.0,
+//   palette: ['red', 'yellow', 'green', 'cyan', 'purple'],
+// };
+// Map.setCenter(-100.55, 40.71, 4);
+// Map.addLayer(janppt, precipitationVis, 'Jan Precipitation');
+// Map.addLayer(febppt, precipitationVis, 'Feb Precipitation');
+// Map.addLayer(marppt, precipitationVis, 'Mar Precipitation');
+// Map.addLayer(aprppt, precipitationVis, 'Apr Precipitation');
+// Map.addLayer(mayppt, precipitationVis, 'May Precipitation');
+// Map.addLayer(junppt, precipitationVis, 'Jun Precipitation');
+// Map.addLayer(julppt, precipitationVis, 'Jul Precipitation');
+// Map.addLayer(augppt, precipitationVis, 'Aug Precipitation');
+// Map.addLayer(sepppt, precipitationVis, 'Sep Precipitation');
+// Map.addLayer(octppt, precipitationVis, 'Oct Precipitation');
+// Map.addLayer(novppt, precipitationVis, 'Nov Precipitation');
+// Map.addLayer(decppt, precipitationVis, 'Dec Precipitation');
 
-// tmean next
+// Select temperature by month and take the mean
 var tmean = prism.select('tmean');
-var jantmean = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(1,1,'month'));
-var febtmean = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(2,2,'month'));
-var martmean = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(3,3,'month'));
-var aprtmean = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(4,4,'month'));
-var maytmean = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(5,5,'month'));
-var juntmean = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(6,6,'month'));
-var jultmean = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(7,7,'month'));
-var augtmean = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(8,8,'month'));
-var septmean = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(9,9,'month'));
-var octtmean = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(10,10,'month'));
-var novtmean = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(11,11,'month'));
-var dectmean = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
-.filter(ee.Filter.calendarRange(12,12,'month'));
+var jantemp = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
+.filter(ee.Filter.calendarRange(1,1,'month')).mean();
+var febtemp = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
+.filter(ee.Filter.calendarRange(2,2,'month')).mean();
+var martemp = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
+.filter(ee.Filter.calendarRange(3,3,'month')).mean();
+var aprtemp = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
+.filter(ee.Filter.calendarRange(4,4,'month')).mean();
+var maytemp = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
+.filter(ee.Filter.calendarRange(5,5,'month')).mean();
+var juntemp = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
+.filter(ee.Filter.calendarRange(6,6,'month')).mean();
+var jultemp = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
+.filter(ee.Filter.calendarRange(7,7,'month')).mean();
+var augtemp = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
+.filter(ee.Filter.calendarRange(8,8,'month')).mean();
+var septemp = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
+.filter(ee.Filter.calendarRange(9,9,'month')).mean();
+var octtemp = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
+.filter(ee.Filter.calendarRange(10,10,'month')).mean();
+var novtemp = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
+.filter(ee.Filter.calendarRange(11,11,'month')).mean();
+var dectemp = tmean.filter(ee.Filter.calendarRange(1985,2015,'year'))
+.filter(ee.Filter.calendarRange(12,12,'month')).mean();
 
-// reduce image collection with mean()
-var jantmean = jantmean.mean();
-var febtmean = febtmean.mean();
-var martmean = martmean.mean();
-var aprtmean = aprtmean.mean();
-var maytmean = maytmean.mean();
-var juntmean = juntmean.mean();
-var jultmean = jultmean.mean();
-var augtmean = augtmean.mean();
-var septmean = septmean.mean();
-var octtmean = octtmean.mean();
-var novtmean = novtmean.mean();
-var dectmean = dectmean.mean();
+// Create a multiband image for export
+var temp = jantemp.addBands(febtemp).addBands(martemp).addBands(aprtemp).addBands(maytemp).addBands(juntemp).addBands(jultemp).addBands(augtemp).addBands(septemp).addBands(octtemp).addBands(novtemp).addBands(dectemp);
 
-var tmeanVis = {
-  min: -30.0,
-  max: 30.0,
-  palette: ['red', 'yellow', 'green', 'cyan', 'purple'],
-};
-Map.setCenter(-100.55, 40.71, 4);
-Map.addLayer(jantmean, tmeanVis, 'Jan Tmean');
-Map.addLayer(febtmean, tmeanVis, 'Feb Tmean');
-Map.addLayer(martmean, tmeanVis, 'Mar Tmean');
-Map.addLayer(aprtmean, tmeanVis, 'Apr Tmean');
-Map.addLayer(maytmean, tmeanVis, 'May Tmean');
-Map.addLayer(juntmean, tmeanVis, 'Jun Tmean');
-Map.addLayer(jultmean, tmeanVis, 'Jul Tmean');
-Map.addLayer(augtmean, tmeanVis, 'Aug Tmean');
-Map.addLayer(septmean, tmeanVis, 'Sep Tmean');
-Map.addLayer(octtmean, tmeanVis, 'Oct Tmean');
-Map.addLayer(novtmean, tmeanVis, 'Nov Tmean');
-Map.addLayer(dectmean, tmeanVis, 'Dec Tmean');
+
+// Uncomment using Command / for visualization
+// var tmeanVis = {
+//   min: -30.0,
+//   max: 30.0,
+//   palette: ['red', 'yellow', 'green', 'cyan', 'purple'],
+// };
+// Map.setCenter(-100.55, 40.71, 4);
+// Map.addLayer(jantemp, tmeanVis, 'Jan Tmean');
+// Map.addLayer(febtemp, tmeanVis, 'Feb Tmean');
+// Map.addLayer(martemp, tmeanVis, 'Mar Tmean');
+// Map.addLayer(aprtemp, tmeanVis, 'Apr Tmean');
+// Map.addLayer(maytemp, tmeanVis, 'May Tmean');
+// Map.addLayer(juntemp, tmeanVis, 'Jun Tmean');
+// Map.addLayer(jultemp, tmeanVis, 'Jul Tmean');
+// Map.addLayer(augtemp, tmeanVis, 'Aug Tmean');
+// Map.addLayer(septemp, tmeanVis, 'Sep Tmean');
+// Map.addLayer(octtemp, tmeanVis, 'Oct Tmean');
+// Map.addLayer(novtemp, tmeanVis, 'Nov Tmean');
+// Map.addLayer(dectemp, tmeanVis, 'Dec Tmean');
 
 
 ////////////////   Datasets of Interest  //////////////////////
@@ -305,6 +293,7 @@ var spechum = cfsv2.select('Specific_humidity_height_above_ground').toBands();
 var prec = cfsv2.select('Precipitation_rate_surface_6_Hour_Average').toBands();
 var lwr = cfsv2.select('Downward_Long-Wave_Radp_Flux_surface_6_Hour_Average').toBands();
 var swr = cfsv2.select('Downward_Short-Wave_Radiation_Flux_surface_6_Hour_Average').toBands();
+
 // To check the time iterations, look at the printed variable in the console
 print(tair, 'tair from CFSv2');
 
@@ -327,7 +316,7 @@ Export.image.toDrive({
   image: SRTM90,
   description: dem_name+'_'+domain_name,
   region: my_domain,
-  scale: my_resolution,
+  scale: sm_resolution,
   crs: epsg_code,
   maxPixels: 1e12
 });
@@ -337,7 +326,7 @@ Export.image.toDrive({
   image: lcsingle,
   description: lc_name+'_'+domain_name,
   region: my_domain,
-  scale: my_resolution,
+  scale: sm_resolution,
   crs: epsg_code,
 });
 
@@ -351,7 +340,7 @@ Export.image.toDrive({
 });
 
 
-// Export the CFSv2 Temp to Geotiff 
+// Export the CFSv2 Elev to Geotiff 
 Export.image.toDrive({
   image: elev,
   description: 'cfsv2_'+begin+end+'_elev',
@@ -397,7 +386,7 @@ Export.image.toDrive({
   crs: epsg_code,
 });
 
-// Export the CFSv2 RedHum to Geotiff 
+// Export the CFSv2 SpecHum to Geotiff 
 Export.image.toDrive({
   image: spechum,
   description: 'cfsv2_'+begin+end+'_spechum' ,
@@ -424,221 +413,25 @@ Export.image.toDrive({
   crs: epsg_code,
 });
 
-// Precip grids
-// Export the Jan ppt to Geotiff
+////////////////////////////////////////////
+///////// Prism Multiband Images ///////////
+////////////////////////////////////////////
+
+// Export the Prec to Geotiff
 Export.image.toDrive({
-  image: janmean,
-  description: 'janppt',
+  image: prec,
+  description: 'PRISM_Precip',
   region: my_domain,
-  scale: my_resolution,
+  scale: PRISM_resolution,
   crs: epsg_code,
 });
 
 // Export the Feb ppt to Geotiff
 Export.image.toDrive({
-  image: febmean,
-  description: 'febppt',
+  image: temp,
+  description: 'PRISM_Temp',
   region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the Mar ppt to Geotiff
-Export.image.toDrive({
-  image: marmean,
-  description: 'marppt',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the Apr ppt to Geotiff
-Export.image.toDrive({
-  image: aprmean,
-  description: 'aprppt',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the May ppt to Geotiff
-Export.image.toDrive({
-  image: maymean,
-  description: 'mayppt',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the Jun ppt to Geotiff
-Export.image.toDrive({
-  image: junmean,
-  description: 'junppt',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the Jul ppt to Geotiff
-Export.image.toDrive({
-  image: julmean,
-  description: 'julppt',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the Aug ppt to Geotiff
-Export.image.toDrive({
-  image: augmean,
-  description: 'augppt',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the Sep ppt to Geotiff
-Export.image.toDrive({
-  image: sepmean,
-  description: 'sepppt',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the Oct ppt to Geotiff
-Export.image.toDrive({
-  image: octmean,
-  description: 'octppt',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the Nov ppt to Geotiff
-Export.image.toDrive({
-  image: novmean,
-  description: 'novppt',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the Dec ppt to Geotiff
-Export.image.toDrive({
-  image: decmean,
-  description: 'decppt',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Tmean grids
-// Export the Jan tmean to Geotiff
-Export.image.toDrive({
-  image: jantmean,
-  description: 'jantmean',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the Feb tmean to Geotiff
-Export.image.toDrive({
-  image: febtmean,
-  description: 'febtmean',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the Mar tmean to Geotiff
-Export.image.toDrive({
-  image: martmean,
-  description: 'martmean',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the Apr tmean to Geotiff
-Export.image.toDrive({
-  image: aprtmean,
-  description: 'aprtmean',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the May tmean to Geotiff
-Export.image.toDrive({
-  image: maytmean,
-  description: 'maytmean',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the Jun tmean to Geotiff
-Export.image.toDrive({
-  image: juntmean,
-  description: 'juntmean',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the Jul tmean to Geotiff
-Export.image.toDrive({
-  image: jultmean,
-  description: 'jultmean',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the Aug tmean to Geotiff
-Export.image.toDrive({
-  image: augtmean,
-  description: 'augtmean',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the Sep tmean to Geotiff
-Export.image.toDrive({
-  image: septmean,
-  description: 'septmean',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the Oct tmean to Geotiff
-Export.image.toDrive({
-  image: octtmean,
-  description: 'octtmean',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the Nov tmean to Geotiff
-Export.image.toDrive({
-  image: novtmean,
-  description: 'novtmean',
-  region: my_domain,
-  scale: my_resolution,
-  crs: epsg_code,
-});
-
-// Export the Dec tmean to Geotiff
-Export.image.toDrive({
-  image: dectmean,
-  description: 'dectmean',
-  region: my_domain,
-  scale: my_resolution,
+  scale: PRISM_resolution,
   crs: epsg_code,
 });
 
@@ -647,90 +440,49 @@ Export.image.toDrive({
 /////////////////  EXTRA STUFF ////////////////////////////////
 ///////////////////////////////////////////////////////////////
 
-/*
-var dataset = ee.Image('JAXA/ALOS/AW3D30_V1_1');
-var elevation = dataset.select('AVE');
-var elevationVis = {
-  min: 0.0,
-  max: 4000.0,
-  palette: ['0000ff', '00ffff', 'ffff00', 'ff0000', 'ffffff'],
-};
-Map.setCenter(136.85, 37.37, 4);
-Map.addLayer(elevation, elevationVis, 'Elevation');
-*/
+
 
 ///////////////////////////////////////////////////////////////
 ////////////     Import HUC Watersheds     ////////////////////
 ///////////////////////////////////////////////////////////////
 
-// If you want to use the HUC watersheds for some reason, uncomment these lines.
+// If you want to use the HUC watersheds, uncomment these lines with Command / .
 
-var HUC = ee.FeatureCollection('USGS/WBD/2017/HUC08');
-var styleParams = {
-  fillColor: 'ece7f2',
-  color: '000000',
-  width: 1.0,
-};
-var wsheds = HUC.style(styleParams);
-Map.addLayer(wsheds, {}, 'USGS/WBD/2017/HUC08');
-
-
-
-////////////////////////////////////////////////////////////////
-/////////  Save Info from domains in the script    /////////////
-////////////////////////////////////////////////////////////////
-
-/*
-// Thompson Pass Domain
-// Input the minimum lat, lower left corner
-var minLat = 60.9651385
-// Input the minimum long, lower left corner
-var minLong = -146.4828057
-// Input the max lat, upper right corner
-var maxLat = 61.538588
-// Input the max Long, upper right corner
-var maxLong = -144.879882
-//GOA Domain
-// Input the minimum lat, lower left corner
-var minLat = 56.2819
-// Input the minimum long, lower left corner
-var minLong = -156.8955
-// Input the max lat, upper right corner
-var maxLat = 60.8622
-// Input the max Long, upper right corner
-var maxLong = -122.7722
-*/
-
-//Central OR Domain
-// Input the minimum lat, lower left corner
-//var minLat = 42.045789
-// Input the minimum long, lower left corner
-//var minLong = -123.476288
-// Input the max lat, upper right corner
-//var maxLat = 45.702675
-// Input the max Long, upper right corner
-//var maxLong = -121.231792
+// var HUC = ee.FeatureCollection('USGS/WBD/2017/HUC08');
+// var styleParams = {
+//   fillColor: 'ece7f2',
+//   color: '000000',
+//   width: 1.0,
+// };
+// var wsheds = HUC.style(styleParams);
+// Map.addLayer(wsheds, {}, 'USGS/WBD/2017/HUC08');
 
 
 //////////////////////////////////////////////////////////
 /////////////   ASPECT/SLOPE/HILLSHADE  //////////////////
 ///////////////////////////////////////////////////////////////
-/*
-// This pre-cooked GEE function calculates slope in degrees (0-90) from the DEM layer.
-// It uses a 4 connected neighbors approach and edge pixels will have missing data.
-var slope = ee.Terrain.slope(DEM);
-Map.addLayer(slope,{},'Slope');
-// This pre-cooked GEE function calculates aspect in degrees (0-365) from the DEM layer.
-// It uses a 4 connected neighbors approach and edge pixels will have missing data.
-var aspect = ee.Terrain.aspect(DEM);
-Map.addLayer(aspect,{},'Aspect');
-// This pre-cooked GEE function creates a hillshade layer from the DEM.
-// This can come in handy when trying to recognize local geography and physical features.
-var hillshade = ee.Terrain.hillshade(DEM);
-Map.addLayer(hillshade,visHillshade,'Hillshade');
-// This pre-cooked function allows all of the terrain products to be visualized in a single,
-// multi-band image. I like the red tinted visualization the best, with hillshade, slope, and
-// elevation data as the RGB layers. 
-var all = ee.Terrain.products(DEM);
-Map.addLayer(all,visProducts,'All Terrain Products');
-*/
+
+
+// If you want to calculate aspect, slope, hillshade, uncomment these lines with Command / .
+// 
+// // This pre-cooked GEE function calculates slope in degrees (0-90) from the DEM layer.
+// // It uses a 4 connected neighbors approach and edge pixels will have missing data.
+// var slope = ee.Terrain.slope(DEM);
+// Map.addLayer(slope,{},'Slope');
+// 
+// // This pre-cooked GEE function calculates aspect in degrees (0-365) from the DEM layer.
+// // It uses a 4 connected neighbors approach and edge pixels will have missing data.
+// var aspect = ee.Terrain.aspect(DEM);
+// Map.addLayer(aspect,{},'Aspect');
+// 
+// // This pre-cooked GEE function creates a hillshade layer from the DEM.
+// // This can come in handy when trying to recognize local geography and physical features.
+// var hillshade = ee.Terrain.hillshade(DEM);
+// Map.addLayer(hillshade,visHillshade,'Hillshade');
+// 
+// // This pre-cooked function allows all of the terrain products to be visualized in a single,
+// // multi-band image. I like the red tinted visualization the best, with hillshade, slope, and
+// // elevation data as the RGB layers. 
+// var all = ee.Terrain.products(DEM);
+// Map.addLayer(all,visProducts,'All Terrain Products');
+// 
