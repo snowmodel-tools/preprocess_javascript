@@ -83,7 +83,7 @@ var lc_name = 'NLCD2016';
 // This will start on the 'begin' date at 0:00 and the last iteration will be 
 // on the day before the 'end' date below.
 var begin = '2014-09-01';
-var end = '2015-09-02';
+var end = '2015-09-30';
 
 //////////////////////////////////////////////////////////////////
 /////////////////      DOMAIN     ////////////////////////////////
@@ -333,7 +333,7 @@ Export.image.toDrive({
 // Export the CFSv2 Temp to Geotiff 
 Export.image.toDrive({
   image: tair,
-  description: 'cfsv2_'+begin+end+'_tair',
+  description: 'cfsv2_'+begin+'_'+end+'_tair',
   region: my_domain2,
   scale: 22200,
   crs: epsg_code,
@@ -343,7 +343,7 @@ Export.image.toDrive({
 // Export the CFSv2 Elev to Geotiff 
 Export.image.toDrive({
   image: elev,
-  description: 'cfsv2_'+begin+end+'_elev',
+  description: 'cfsv2_'+begin+'_'+end+'_elev',
   region: my_domain2,
   scale: 22200,
   crs: epsg_code,
@@ -352,7 +352,7 @@ Export.image.toDrive({
 // Export the CFSv2 Prec to Geotiff 
 Export.image.toDrive({
   image: prec,
-  description: 'cfsv2_'+begin+end+'_prec' ,
+  description: 'cfsv2_'+begin+'_'+end+'_prec' ,
   region: my_domain2,
   scale: 22200,
   crs: epsg_code,
@@ -361,7 +361,7 @@ Export.image.toDrive({
 // Export the CFSv2 Uwind to Geotiff 
 Export.image.toDrive({
   image: uwind,
-  description: 'cfsv2_'+begin+end+'_uwind' ,
+  description: 'cfsv2_'+begin+'_'+end+'_uwind' ,
   region: my_domain2,
   scale: 22200,
   crs: epsg_code,
@@ -371,7 +371,7 @@ Export.image.toDrive({
 // Export the CFSv2 Vwind to Geotiff 
 Export.image.toDrive({
   image: vwind,
-  description: 'cfsv2_'+begin+end+'_vwind' ,
+  description: 'cfsv2_'+begin+'_'+end+'_vwind' ,
   region: my_domain2,
   scale: 22200,
   crs: epsg_code,
@@ -380,7 +380,7 @@ Export.image.toDrive({
 // Export the CFSv2 Surfpres to Geotiff 
 Export.image.toDrive({
   image: surfpres,
-  description: 'cfsv2_'+begin+end+'_surfpres' ,
+  description: 'cfsv2_'+begin+'_'+end+'_surfpres' ,
   region: my_domain2,
   scale: 22200,
   crs: epsg_code,
@@ -389,7 +389,7 @@ Export.image.toDrive({
 // Export the CFSv2 SpecHum to Geotiff 
 Export.image.toDrive({
   image: spechum,
-  description: 'cfsv2_'+begin+end+'_spechum' ,
+  description: 'cfsv2_'+begin+'_'+end+'_spechum' ,
   region: my_domain2,
   scale: 22200,
   crs: epsg_code,
@@ -398,7 +398,7 @@ Export.image.toDrive({
 // Export the CFSv2 LWR to Geotiff 
 Export.image.toDrive({
   image: lwr,
-  description: 'cfsv2_'+begin+end+'_lwr' ,
+  description: 'cfsv2_'+begin+'_'+end+'_lwr' ,
   region: my_domain2,
   scale: 22200,
   crs: epsg_code,
@@ -407,7 +407,7 @@ Export.image.toDrive({
 // Export the CFSv2 SWR to Geotiff 
 Export.image.toDrive({
   image: swr,
-  description: 'cfsv2_'+begin+end+'_swr' ,
+  description: 'cfsv2_'+begin+'_'+end+'_swr' ,
   region: my_domain2,
   scale: 22200,
   crs: epsg_code,
